@@ -2,17 +2,17 @@
   <img src="https://community.trinitycore.org/public/style_images/1_trinitycore.png" alt="TrinityCore Logo" width="200"/>
 </p>
 
-<h1 align="center">⚔️ TRIBOTSLK</h1>
+<h1 align="center">⚔️ TRIBOTSLK-V2</h1>
 
 <p align="center">
   <em>TrinityCore 3.3.5a con NPCBots inteligentes que conversan usando IA</em>
 </p>
 
 <p align="center">
-  <a href="https://github.com/Razormaw/TRIBOTSLK/stargazers">
-    <img src="https://img.shields.io/github/stars/Razormaw/TRIBOTSLK?style=for-the-badge&color=gold&logo=starship" alt="Stars"/>
+  <a href="https://github.com/Razormaw/TRIBOTSLK-V2/stargazers">
+    <img src="https://img.shields.io/github/stars/Razormaw/TRIBOTSLK-V2?style=for-the-badge&color=gold&logo=starship" alt="Stars"/>
   </a>
-  <a href="https://github.com/Razormaw/TRIBOTSLK/blob/main/COPYING">
+  <a href="https://github.com/Razormaw/TRIBOTSLK-V2/blob/main/COPYING">
     <img src="https://img.shields.io/badge/license-GPL--2.0-blue?style=for-the-badge&logo=gnu" alt="License"/>
   </a>
   <a href="#">
@@ -38,7 +38,7 @@
 
 ## 📖 Sobre el proyecto
 
-**TRIBOTSLK** es un fork extendido de [TrinityCore 3.3.5a](https://github.com/TrinityCore/TrinityCore) con el mod [NPCBots](https://github.com/trickerer/TrinityCore-3.3.5-with-NPCBots), que agrega una capa única de **inteligencia artificial conversacional** sobre el sistema de bots existente.
+**TRIBOTSLK-V2** es un fork extendido de [TrinityCore 3.3.5a](https://github.com/TrinityCore/TrinityCore) con el mod [NPCBots](https://github.com/trickerer/TrinityCore-3.3.5-with-NPCBots), que agrega una capa única de **inteligencia artificial conversacional** sobre el sistema de bots existente.
 
 > 🌟 **Nació de una motivación simple:** *los bugs que me frustraban como jugador, hoy los arreglo como desarrollador.*
 
@@ -109,8 +109,8 @@ Consulta la [wiki oficial de TrinityCore](https://trinitycore.info/en/install/re
 ### 1️⃣ Clonar el repositorio
 
 ```bash
-git clone https://github.com/Razormaw/TRIBOTSLK.git
-cd TRIBOTSLK
+git clone https://github.com/Razormaw/TRIBOTSLK-V2.git
+cd TRIBOTSLK-V2
 ```
 
 ### 2️⃣ Compilar TrinityCore
@@ -185,7 +185,7 @@ NpcBot.LLM.PlayerChain.MaxTurns = 3
 
 ## 🐛 Reportar problemas
 
-Antes de abrir un issue, revisa los [issues existentes](https://github.com/Razormaw/TRIBOTSLK/issues) para evitar duplicados.
+Antes de abrir un issue, revisa los [issues existentes](https://github.com/Razormaw/TRIBOTSLK-V2/issues) para evitar duplicados.
 
 Al reportar, incluye:
 - Descripción clara del problema
@@ -328,7 +328,7 @@ Este proyecto está licenciado bajo la **GNU General Public License v2.0** — v
 
 *Que los bots de Azeroth tengan conversaciones inteligentes.*
 
-**`-- Razormaw, TRIBOTSLK --`**
+**`-- Razormaw, TRIBOTSLK-V2 --`**
 
 <img src="https://img.shields.io/badge/Made%20with-❤️-red?style=flat-square"/>
 <img src="https://img.shields.io/badge/Powered%20by-AI-00d4aa?style=flat-square"/>
