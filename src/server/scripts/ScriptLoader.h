@@ -19,5 +19,6 @@
 #define SC_SCRIPTLOADER_H
 
 void AddScripts();
+void AddSC_npcbot_llm_chat();
 
 #endif

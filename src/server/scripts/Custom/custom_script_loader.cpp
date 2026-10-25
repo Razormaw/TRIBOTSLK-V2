@@ -1,4 +1,5 @@
 /*
+/*
  * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -15,10 +16,11 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-// This is where scripts' loading functions should be declared:
+// Declaración de la función del script
+void AddSC_npcbot_llm_chat();
 
-// The name of this function should match:
-// void Add${NameOfDirectory}Scripts()
 void AddCustomScripts()
 {
+    AddSC_npcbot_llm_chat();
 }
+

@@ -44,7 +44,7 @@
 
 ### ¿Qué hace especial a este proyecto?
 
-✨ **180+ NPCBots** vagando por Azeroth con conversaciones espontáneas  (Gracias a Trickerer)
+✨ **180+ NPCBots** vagando por Azeroth con conversaciones espontáneas  (Gracias a Trickerer en la creación de los NPCBots)
 🤖 **Chat con IA** usando Qwen 3.8 27B vía Groq (respuesta en 2-4 segundos)  
 💬 **Cadenas de respuestas**: varios bots te contestan en fila, como una mesa de taberna  
 🌍 **Mundo vivo**: los bots charlan entre ellos cuando no hay jugadores  
