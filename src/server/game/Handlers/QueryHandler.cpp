@@ -43,7 +43,7 @@ void WorldSession::SendNameQueryOpcode(ObjectGuid guid)
 {
     WorldPackets::Query::QueryPlayerNameResponse response;
     response.Player = guid;
-
+    
     //npcbot: try query bot info
     if (guid.IsCreature())
     {
@@ -58,42 +58,45 @@ void WorldSession::SendNameQueryOpcode(ObjectGuid guid)
                 if (creatureInfo->Name.size() > loc && !creatureInfo->Name[loc].empty() && Utf8FitTo(creatureInfo->Name[loc], {}))
                     creatureName = creatureInfo->Name[loc];
             }
-
-            NpcBotExtras const* extData = ASSERT_NOTNULL(BotDataMgr::SelectNpcBotExtras(creatureId));
+            
+            // Obtener datos del bot de forma segura (sin ASSERT_NOTNULL)
+            NpcBotExtras const* extData = BotDataMgr::SelectNpcBotExtras(creatureId);
             NpcBotAppearanceData const* appData = BotDataMgr::SelectNpcBotAppearance(creatureId);
-
-            response.Result = RESPONSE_SUCCESS; // name known
-
-            WorldPackets::Query::PlayerGuidLookupData& bdata = response.Data.emplace();
-            bdata.Name = creatureName;
-            bdata.Race = BotMgr::GetBotPlayerRace(extData->bclass, extData->race);
-            bdata.Sex = appData ? appData->gender : static_cast<uint8>(GENDER_MALE);
-            bdata.ClassID = BotMgr::GetBotPlayerClass(extData->bclass);
+            
+            if (extData)
+            {
+                response.Result = RESPONSE_SUCCESS; // name known
+                WorldPackets::Query::PlayerGuidLookupData& bdata = response.Data.emplace();
+                bdata.Name = creatureName;
+                bdata.Race = BotMgr::GetBotPlayerRace(extData->bclass, extData->race);
+                bdata.Sex = appData ? appData->gender : static_cast<uint8>(GENDER_MALE);
+                bdata.ClassID = BotMgr::GetBotPlayerClass(extData->bclass);
+            }
+            else
+            {
+                response.Result = RESPONSE_FAILURE; // name unknown
+            }
         }
         else
             response.Result = RESPONSE_FAILURE; // name unknown
-
         SendPacket(response.Write());
         return;
     }
     //end npcbot
-
+    
     if (CharacterCacheEntry const* characterInfo = sCharacterCache->GetCharacterCacheByGuid(guid))
     {
         response.Result = RESPONSE_SUCCESS; // name known
-
         WorldPackets::Query::PlayerGuidLookupData& data = response.Data.emplace();
         data.Name = characterInfo->Name;
         data.Race = characterInfo->Race;
         data.Sex = characterInfo->Sex;
         data.ClassID = characterInfo->Class;
-
         if (Player* player = ObjectAccessor::FindConnectedPlayer(guid))
             data.DeclinedNames = player->GetDeclinedNames();
     }
     else
         response.Result = RESPONSE_FAILURE; // name unknown
-
     SendPacket(response.Write());
 }
 

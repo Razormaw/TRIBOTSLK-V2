@@ -1,20 +1,16 @@
 /*
- * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
+This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
+This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation; either version 2 of the License, or (at your
+option) any later version.
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+more details.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <http://www.gnu.org/licenses/>.
+*/
 #include "WorldSession.h"
 #include "AccountMgr.h"
 #include "AreaTriggerPackets.h"
@@ -53,6 +49,12 @@
 #include "WhoPackets.h"
 #include "World.h"
 #include "WorldPacket.h"
+
+// === NPCBOT LLM: AGREGADO - Includes para NpcBots ===
+#include "botdatamgr.h"
+#include "bot_ai.h"
+// === FIN NPCBOT LLM ===
+
 #include <cstdarg>
 #include <zlib.h>
 
@@ -129,7 +131,6 @@ void WorldSession::HandleGossipSelectOptionOpcode(WorldPackets::NPC::GossipSelec
         TC_LOG_DEBUG("network", "WORLD: HandleGossipSelectOptionOpcode - Script reloaded while in use, ignoring and set new scipt id");
         if (unit)
             unit->LastUsedScriptID = unit->GetScriptId();
-
         if (go)
             go->LastUsedScriptID = go->GetScriptId();
         _player->PlayerTalkClass->SendCloseGossip();
@@ -177,17 +178,14 @@ void WorldSession::HandleWhoOpcode(WorldPackets::Who::WhoRequestPkt& whoRequest)
     for (size_t i = 0; i < request.Words.size(); ++i)
     {
         TC_LOG_DEBUG("network", "WorldSession::HandleWhoOpcode: Word: {}", request.Words[i].Word);
-
         // user entered string, it used as universal search pattern(guild+player name)?
         if (!Utf8toWStr(request.Words[i].Word, wWords[i]))
             continue;
-
         wstrToLower(wWords[i]);
     }
 
     std::wstring wPlayerName;
     std::wstring wGuildName;
-
     if (!(Utf8toWStr(request.Name, wPlayerName) && Utf8toWStr(request.Guild, wGuildName)))
         return;
 
@@ -200,11 +198,9 @@ void WorldSession::HandleWhoOpcode(WorldPackets::Who::WhoRequestPkt& whoRequest)
         whoRequest.Request.MaxLevel = STRONG_MAX_LEVEL;
 
     uint32 team = _player->GetTeam();
-
-    uint32 gmLevelInWhoList  = sWorld->getIntConfig(CONFIG_GM_LEVEL_IN_WHO_LIST);
+    uint32 gmLevelInWhoList = sWorld->getIntConfig(CONFIG_GM_LEVEL_IN_WHO_LIST);
 
     WorldPackets::Who::WhoResponsePkt response;
-
     WhoListInfoVector const& whoList = sWhoListStorageMgr->GetWhoList();
     for (WhoListPlayerInfo const& target : whoList)
     {
@@ -243,7 +239,6 @@ void WorldSession::HandleWhoOpcode(WorldPackets::Who::WhoRequestPkt& whoRequest)
             continue;
 
         std::wstring const& wTargetGuildName = target.GetWideGuildName();
-
         if (!wGuildName.empty() && wTargetGuildName.find(wGuildName) == std::wstring::npos)
             continue;
 
@@ -289,7 +284,103 @@ void WorldSession::HandleWhoOpcode(WorldPackets::Who::WhoRequestPkt& whoRequest)
         whoEntry.AreaID = target.GetZoneId();
     }
 
-    SendPacket(response.Write());
+    // === NPCBOT LLM: AGREGADO - Incluir NpcBots wandering en la lista Who ===
+	NpcBotRegistry const& botRegistry = BotDataMgr::GetExistingNPCBots();
+	for (NpcBotRegistry::const_iterator itr = botRegistry.begin(); itr != botRegistry.end(); ++itr)
+	{
+		Creature* bot = const_cast<Creature*>(*itr);
+		if (!bot || !bot->IsInWorld() || !bot->IsAlive())
+			continue;
+
+		// Solo bots wandering (sin dueño o dueño offline)
+		bot_ai* botAI = bot->GetBotAI();
+		if (!botAI || !botAI->IAmFree())
+			continue;
+
+		// Obtener datos del bot
+		uint8 botLevel = bot->GetLevel();
+		NpcBotExtras const* extras = botAI->GetBotExtras();
+		uint8 botClass = extras ? extras->bclass : 0;
+		uint8 botRace = extras ? extras->race : 0;
+		std::string botName = bot->GetName();
+		uint32 botZoneId = bot->GetZoneId();
+		uint8 botGender = bot->GetByteValue(UNIT_FIELD_BYTES_0, 2);
+
+		// Aplicar filtros
+
+        // Filtro de nivel
+        if (botLevel < request.MinLevel || botLevel > request.MaxLevel)
+            continue;
+
+        // Filtro de clase
+        if (request.ClassFilter >= 0 && !(request.ClassFilter & (1 << botClass)))
+            continue;
+
+        // Filtro de raza
+        if (request.RaceFilter >= 0 && !(request.RaceFilter & (1 << botRace)))
+            continue;
+
+        // Filtro de zona
+        if (!whoRequest.Request.Areas.empty())
+            if (std::ranges::find(whoRequest.Request.Areas, int32(botZoneId)) == whoRequest.Request.Areas.end())
+                continue;
+
+        // Filtro de nombre
+        std::wstring wBotName;
+        if (!Utf8toWStr(botName, wBotName))
+            continue;
+        wstrToLower(wBotName);
+
+        if (!wPlayerName.empty() && wBotName.find(wPlayerName) == std::wstring::npos)
+            continue;
+
+        // Filtro de guild (los bots no tienen guild, así que saltar si hay filtro)
+        if (!wGuildName.empty())
+            continue;
+
+        // Filtro de palabras
+        if (!wWords.empty())
+        {
+            std::string aName;
+            if (AreaTableEntry const* areaEntry = sAreaTableStore.LookupEntry(botZoneId))
+                aName = areaEntry->AreaName[GetSessionDbcLocale()];
+
+            bool show = false;
+            for (size_t i = 0; i < wWords.size(); ++i)
+            {
+                if (!wWords[i].empty())
+                {
+                    if (wBotName.find(wWords[i]) != std::wstring::npos ||
+                        Utf8FitTo(aName, wWords[i]))
+                    {
+                        show = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!show)
+                continue;
+        }
+
+        // Agregar bot a la lista Who
+		++response.Response.TotalMatches;
+
+		if (response.Response.Entries.size() >= sWorld->getIntConfig(CONFIG_MAX_WHO))
+			continue;
+
+		WorldPackets::Who::WhoEntry& whoEntry = response.Response.Entries.emplace_back();
+		whoEntry.Name = botName;
+		whoEntry.GuildName = ""; // Los bots no tienen guild
+		whoEntry.Level = botLevel;
+		whoEntry.ClassID = botClass;
+		whoEntry.Race = botRace;
+		whoEntry.Sex = botGender;
+		whoEntry.AreaID = botZoneId;
+	}
+		// === FIN NPCBOT LLM ===
+
+	SendPacket(response.Write());
 }
 
 void WorldSession::HandleLogoutRequestOpcode(WorldPackets::Character::LogoutRequest& /*logoutRequest*/)
@@ -299,7 +390,7 @@ void WorldSession::HandleLogoutRequestOpcode(WorldPackets::Character::LogoutRequ
         DoLootRelease(lguid);
 
     bool instantLogout = (GetPlayer()->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_RESTING) && !GetPlayer()->IsInCombat()) ||
-                         GetPlayer()->IsInFlight() || HasPermission(rbac::RBAC_PERM_INSTANT_LOGOUT);
+                          GetPlayer()->IsInFlight() || HasPermission(rbac::RBAC_PERM_INSTANT_LOGOUT);
 
     /// TODO: Possibly add RBAC permission to log out in combat
     bool canLogoutInCombat = GetPlayer()->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_RESTING);
@@ -353,7 +444,6 @@ void WorldSession::HandleLogoutCancelOpcode(WorldPackets::Character::LogoutCance
         return;
 
     SetLogoutStartTime(0);
-
     SendPacket(WorldPackets::Character::LogoutCancelAck().Write());
 
     // not remove flags if can't free move - its not set in Logout request code.
@@ -361,10 +451,8 @@ void WorldSession::HandleLogoutCancelOpcode(WorldPackets::Character::LogoutCance
     {
         //!we can move again
         GetPlayer()->SetRooted(false);
-
         //! Stand Up
         GetPlayer()->SetStandState(UNIT_STAND_STATE_STAND);
-
         //! DISABLE_ROTATE
         GetPlayer()->RemoveUnitFlag(UNIT_FLAG_STUNNED);
     }
@@ -400,12 +488,10 @@ void WorldSession::HandleZoneUpdateOpcode(WorldPacket& recvData)
 {
     uint32 newZone;
     recvData >> newZone;
-
     TC_LOG_DEBUG("network", "WORLD: Recvd ZONE_UPDATE: {}", newZone);
 
     // use server side data, but only after update the player position. See Player::UpdatePosition().
     GetPlayer()->SetNeedsZoneUpdate(true);
-
     //GetPlayer()->SendInitWorldStates(true, newZone);
 }
 
@@ -458,9 +544,7 @@ void WorldSession::HandleBugOpcode(WorldPacket& recvData)
 {
     uint32 suggestion, contentlen, typelen;
     std::string content, type;
-
     recvData >> suggestion >> contentlen >> content;
-
     recvData >> typelen >> type;
 
     if (suggestion == 0)
@@ -472,10 +556,8 @@ void WorldSession::HandleBugOpcode(WorldPacket& recvData)
     TC_LOG_DEBUG("network", "{}", content);
 
     CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_BUG_REPORT);
-
     stmt->setString(0, type);
     stmt->setString(1, content);
-
     CharacterDatabase.Execute(stmt);
 }
 
@@ -536,7 +618,6 @@ void WorldSession::SendAreaTriggerMessage(char const* Text, ...)
     va_list ap;
     char szStr [1024];
     szStr[0] = '\0';
-
     va_start(ap, Text);
     vsnprintf(szStr, 1024, Text, ap);
     va_end(ap);
@@ -553,6 +634,7 @@ void WorldSession::HandleAreaTriggerOpcode(WorldPackets::AreaTrigger::AreaTrigge
     TC_LOG_DEBUG("network", "CMSG_AREATRIGGER. Trigger ID: {}", packet.AreaTriggerID);
 
     Player* player = GetPlayer();
+
     if (player->IsInFlight())
     {
         TC_LOG_DEBUG("network", "HandleAreaTriggerOpcode: Player '{}' {} in flight, ignore Area Trigger ID:{}",
@@ -593,10 +675,8 @@ void WorldSession::HandleAreaTriggerOpcode(WorldPackets::AreaTrigger::AreaTrigge
     {
         // set resting flag we are in the inn
         player->SetRestFlag(REST_FLAG_IN_TAVERN, atEntry->ID);
-
         if (sWorld->IsFFAPvPRealm())
             player->RemovePvpFlag(UNIT_BYTE2_FLAG_FFA_PVP);
-
         return;
     }
 
@@ -706,12 +786,10 @@ void WorldSession::HandleUpdateAccountData(WorldPackets::ClientConfig::UserClien
     if (packet.Size == 0)                               // erase
     {
         SetAccountData(AccountDataType(packet.DataType), 0, "");
-
         WorldPackets::ClientConfig::UpdateAccountDataComplete updateAccountDataComplete;
         updateAccountDataComplete.DataType = packet.DataType;
         updateAccountDataComplete.Result = 0;
         SendPacket(updateAccountDataComplete.Write());
-
         return;
     }
 
@@ -723,7 +801,6 @@ void WorldSession::HandleUpdateAccountData(WorldPackets::ClientConfig::UserClien
 
     std::string dest;
     dest.resize(packet.Size);
-
     uLongf realSize = packet.Size;
     if (uncompress(reinterpret_cast<Bytef*>(dest.data()), &realSize, packet.CompressedData.data(), packet.CompressedData.size()) != Z_OK)
     {
@@ -755,7 +832,6 @@ void WorldSession::HandleRequestAccountData(WorldPackets::ClientConfig::RequestA
     data.DataType = request.DataType;
 
     uLongf destSize = compressBound(data.Size);
-
     data.CompressedData.resize(destSize);
 
     if (data.Size && compress(data.CompressedData.data(), &destSize, (uint8 const*)adata->Data.c_str(), data.Size) != Z_OK)
@@ -765,7 +841,6 @@ void WorldSession::HandleRequestAccountData(WorldPackets::ClientConfig::RequestA
     }
 
     data.CompressedData.resize(destSize);
-
     SendPacket(data.Write());
 }
 
@@ -836,6 +911,7 @@ void WorldSession::HandleWorldTeleportOpcode(WorldPackets::Misc::WorldTeleport& 
 
     WorldLocation loc(worldTeleport.MapID, worldTeleport.Pos);
     loc.SetOrientation(worldTeleport.Facing);
+
     TC_LOG_DEBUG("network", "CMSG_WORLD_TELEPORT: Player = {}, time = {}, map = {}, pos = {}",
         _player->GetName(), worldTeleport.Time, worldTeleport.MapID, loc.ToString());
 
@@ -871,8 +947,8 @@ void WorldSession::HandleWhoIsOpcode(WorldPackets::Who::WhoIsRequest& packet)
 
     LoginDatabasePreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_SEL_ACCOUNT_WHOIS);
     stmt->setUInt32(0, player->GetSession()->GetAccountId());
-
     PreparedQueryResult result = LoginDatabase.Query(stmt);
+
     if (!result)
     {
         SendNotification(LANG_ACCOUNT_FOR_PLAYER_NOT_FOUND, packet.CharName.c_str());
@@ -883,11 +959,9 @@ void WorldSession::HandleWhoIsOpcode(WorldPackets::Who::WhoIsRequest& packet)
     std::string acc = fields[0].GetString();
     if (acc.empty())
         acc = "Unknown";
-
     std::string email = fields[1].GetString();
     if (email.empty())
         email = "Unknown";
-
     std::string lastip = fields[2].GetString();
     if (lastip.empty())
         lastip = "Unknown";
@@ -908,8 +982,10 @@ void WorldSession::HandleComplainOpcode(WorldPacket& recvData)
     uint32 unk3 = 0;
     uint32 unk4 = 0;
     std::string description = "";
+
     recvData >> spam_type;                                 // unk 0x01 const, may be spam type (mail/chat)
     recvData >> spammer_guid;                              // player guid
+
     switch (spam_type)
     {
         case 0:
@@ -955,6 +1031,7 @@ void WorldSession::HandleRealmSplitOpcode(WorldPacket& recvData)
     // 0x2 realm split pending
     data << split_date;
     SendPacket(&data);
+
     //TC_LOG_DEBUG("response sent {}", unk);
 }
 
@@ -1030,7 +1107,6 @@ void WorldSession::HandleSetDungeonDifficultyOpcode(WorldPackets::Misc::SetDunge
     }
 
     Difficulty difficultyID = Difficulty(setDungeonDifficulty.DifficultyID);
-
     Group* group = _player->GetGroup();
     if (group)
     {
@@ -1059,6 +1135,7 @@ void WorldSession::HandleSetDungeonDifficultyOpcode(WorldPackets::Misc::SetDunge
                 return;
             }
         }
+
         // the difficulty is set even if the instances can't be reset
         //_player->SendDungeonDifficulty(true);
         group->ResetInstances(INSTANCE_RESET_CHANGE_DIFFICULTY, false, _player);
@@ -1095,7 +1172,6 @@ void WorldSession::HandleSetRaidDifficultyOpcode(WorldPackets::Misc::SetRaidDiff
     }
 
     Difficulty difficultyID = Difficulty(setRaidDifficulty.DifficultyID);
-
     Group* group = _player->GetGroup();
     if (group)
     {
@@ -1124,6 +1200,7 @@ void WorldSession::HandleSetRaidDifficultyOpcode(WorldPackets::Misc::SetRaidDiff
                 return;
             }
         }
+
         // the difficulty is set even if the instances can't be reset
         //_player->SendDungeonDifficulty(true);
         group->ResetInstances(INSTANCE_RESET_CHANGE_DIFFICULTY, true, _player);
@@ -1145,7 +1222,6 @@ void WorldSession::HandleSetTaxiBenchmarkOpcode(WorldPacket& recvData)
 
     uint8 mode;
     recvData >> mode;
-
     mode ? _player->SetFlag(PLAYER_FLAGS, PLAYER_FLAGS_TAXI_BENCHMARK) : _player->RemoveFlag(PLAYER_FLAGS, PLAYER_FLAGS_TAXI_BENCHMARK);
 
     TC_LOG_DEBUG("network", "Client used \"/timetest {}\" command", mode);
@@ -1162,7 +1238,6 @@ void WorldSession::HandleReadyForAccountDataTimes(WorldPacket& /*recvData*/)
 {
     // empty opcode
     TC_LOG_DEBUG("network", "WORLD: CMSG_READY_FOR_ACCOUNT_DATA_TIMES");
-
     SendAccountDataTimes(GLOBAL_CACHE_MASK);
 }
 
@@ -1211,6 +1286,7 @@ void WorldSession::HandleUpdateMissileTrajectory(WorldPacket& recvPacket)
 
     Unit* caster = ObjectAccessor::GetUnit(*_player, guid);
     Spell* spell = caster ? caster->GetCurrentSpell(CURRENT_GENERIC_SPELL) : nullptr;
+
     if (!spell || spell->m_spellInfo->Id != spellId || !spell->m_targets.HasDst() || !spell->m_targets.HasSrc())
     {
         recvPacket.rfinish();
@@ -1219,7 +1295,6 @@ void WorldSession::HandleUpdateMissileTrajectory(WorldPacket& recvPacket)
 
     spell->m_targets.ModSrc(firePos);
     spell->m_targets.ModDst(impactPos);
-
     spell->m_targets.SetPitch(pitch);
     spell->m_targets.SetSpeed(speed);
 

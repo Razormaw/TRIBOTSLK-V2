@@ -1,5 +1,9 @@
 25 de Octubre del 2026
 
+🤖 Función agregada para que los NPCBots aparezcan en "Who" como si fueran personas reales
+
+================================================================================
+
 🤖 Sistema de Chat LLM para NPCBots
 Funcionalidad 	Descripción
 💬 Respuestas a jugadores 	2-3 bots responden en cadena con pausas naturales de 2-4 s
